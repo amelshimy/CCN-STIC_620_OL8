@@ -1,0 +1,47 @@
+---
+
+- name: Configure limites 
+  blockinfile:
+    backup: true
+    path: /etc/security/limits.conf
+    state: present 
+    block: |
+      *               soft   nofile    4096 
+      *               hard   nofile    65536
+      *               soft   nproc     4096 
+      *               hard   nproc     4096 
+      *               soft   locks     4096 
+      *               hard   locks     4096 
+      *               soft   stack     10240
+      *               hard   stack     32768
+      *               soft   memlock   64
+      *               hard   memlock   64
+      *               soft   maxlogins 5
+      # Límite soft 32GB, hard 64GB
+      *               soft   fsize     33554432
+      *               hard   fsize     67108864
+      # Límites para root
+      root            soft   nofile    4096
+      root            hard   nofile    65536
+      root            soft   nproc     4096
+      root            hard   nproc     4096
+      root            soft    stack     10240
+      root            hard   stack     32768
+      root            soft   fsize     33554432
+      root            hard   maxlogins 0
+- name: PASS_MAX_DAYS
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MAX_DAYS'
+    line: PASS_MAX_DAYS  45         
+- name: PASS_MIN_DAYS
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MIN_DAYS'
+    line: PASS_MIN_DAYS  2
+- name: PASS_WARN_AGE     
+  lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_WARN_AGE'
+    line: PASS_WARN_AGE  10
+...    

@@ -1,0 +1,133 @@
+---
+- name: Desinstalar paquetes de servidores 
+  dnf:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - xinetd
+    - xorg-x11-server-common
+    - avahi-autoipd
+    - avahi
+    - cups
+    - dhcp-server
+    - bind
+    - ftp
+    - vsftpd
+    - tftp-server
+    - dovecot
+    - cyrus-imapd
+    - samba
+    - squid
+    - net-snmp
+    - ypserv
+    - telnet-server
+    - rsync
+    - ypbind
+    - rsh
+    - talk
+    - tftp
+- name: Configurar limites_archivos.conf
+  lineinfile:
+    path: /etc/modprobe.d/limites_archivos.conf
+    create: true
+    line: "{{ item }}"
+  loop:
+    - install cramfs /bin/true
+    - install freevxfs /bin/true
+    - install jffs2 /bin/true
+    - install hfs /bin/true
+    - install hfsplus /bin/true
+    - install squashfs /bin/true
+    - install udf /bin/true
+    - '#Comentar en caso de instalacion EFI'
+    - install fat /bin/true
+    - '#Comentar en caso de instalacion EFI'
+    - install vfat /bin/true
+    - install cifs /bin/true
+    - install nfs /bin/true
+    - install nfsv3 /bin/true
+    - install nfsv4 /bin/true
+    - install gfs2 /bin/true
+    - install bnep /bin/true
+    - install bluetooth /bin/true
+    - install btusb /bin/true
+    - install net-pf-31 /bin/true  
+- name: Desabilitar servicios innecesarios
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false 
+    masked: true 
+  ignore_errors: true  
+  loop: 
+    - bluetooth.target
+    - printer.target
+    - remote-fs.target
+    - rpcbind.target
+    - runlevel4.target
+    - runlevel5.target
+    - runlevel6.target
+    - smartcard.target
+    - sound.target
+    - console-getty.service
+    - debug-shell.service
+    - rdisc.service
+    - ctrl-alt-del.target
+    - iprutils.target
+    - fstrim.timer
+    - container-getty@.service 
+    - console-getty.service
+    - kexec.target
+    - cpupower.service
+    - ebtables.service
+    - dbus-org.freedesktop.hostname1.service
+    - dbus-org.freedesktop.portable1.service
+    - debug-shell.service
+    - dracut-cmdline.service
+    - dracut-initqueue.service
+    - dracut-mount.service
+    - dracut-pre-mount.service
+    - dracut-pre-pivot.service
+    - dracut-pre-trigger.service
+    - dracut-pre-udev.service
+    - dracut-shutdown.service
+    - getty@.service
+    - import-state.service
+    - iprdump.service
+    - iprinit.service
+    - iprupdate.service
+    - kmod-static-nodes.service
+    - loadmodules.service
+    - nftables.service
+    - nis-domainname.service
+    - plymouth-halt.service
+    - plymouth-kexec.service
+    - plymouth-poweroff.service
+    - plymouth-quit-wait.service
+    - plymouth-quit.service
+    - plymouth-read-write.service
+    - plymouth-reboot.service
+    - plymouth-start.service
+    - plymouth-switch-root.service
+    - rdisc.service
+    - rescue.service
+    - serial-getty@.service
+    - systemd-resolved.service
+    - tuned.service
+- name: BLOQUEARÁN LOS COMPILADORES DEL SISTEMA
+  file: 
+    path: '{{ item }}'
+    mode: '0000'
+  ignore_errors: true
+  loop:
+    - /usr/bin/byacc
+    - /usr/bin/yacc
+    - /usr/bin/bcc
+    - /usr/bin/kgcc
+    - /usr/bin/cc
+    - /usr/bin/gcc
+    - /usr/bin/'*c++'
+    - /usr/bin/'*g++' 
+
+  
+

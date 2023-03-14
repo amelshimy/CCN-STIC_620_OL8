@@ -1,0 +1,43 @@
+---
+- name: Install usbguard package 
+  dnf: 
+    name: usbguard
+    state: latest
+- name: Start usbguard service
+  systemd:
+    name: usbguard
+    state: started
+    enabled: true     
+- name: Comentar los prametros por defecto
+  lineinfile:
+    path: /etc/usbguard/usbguard-daemon.conf
+    regexp: '^{{ item }}'
+    line: "#{{ item }}"
+    backup: false
+  notify: usbguard.service  
+  loop:
+    - "PresentControllerPolicy=keep"
+
+- name: Definir los prametros
+  lineinfile:
+    path: /etc/usbguard/usbguard-daemon.conf
+    regexp: '^{{ item }}'
+    line: "{{ item }}"
+    insertafter: '^#{{ item }}'
+    backup: true 
+  notify: usbguard.service  
+  loop:
+    - "RuleFile=/etc/usbguard/rules.conf"
+    - "ImplicitPolicyTarget=block"
+    - "PresentDevicePolicy=apply-policy"
+    - "PresentControllerPolicy=apply-policy"
+    - "InsertedDevicePolicy=apply-policy"
+    - "RestoreControllerDeviceState=false"
+    - "DeviceManagerBackend=uevent"
+    - "IPCAllowedUsers=root opc"
+    - "IPCAllowedGroups=wheel" 
+    - "IPCAccessControlFiles=/etc/usbguard/IPCAccessControl.d/"
+    - "DeviceRulesWithPort=false"
+    - "AuditBackend=FileAudit"
+    - "AuditFilePath=/var/log/usbguard/usbguard-audit.log"
+...

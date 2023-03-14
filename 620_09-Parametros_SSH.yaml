@@ -1,0 +1,40 @@
+---
+
+- name: MODIFICANDO CONFIGURACION SSH
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^{{ item.key }}'
+    line: "{{ item.key}} {{ item.value }}"
+    backup: true 
+  notify: sshd_service  
+  loop:
+    - { key: "Port" , value: "22" }  
+    - { key: "Protocol" , value: "2" }  
+    - { key: "SyslogFacility" , value: "AUTHPRIV" }  
+    - { key: "LoginGraceTime" , value: "2m" }  
+    - { key: "PermitRootLogin" , value: "no" }  
+    - { key: "MaxAuthTries" , value: "3" }  
+    - { key: "AuthorizedKeysFile" , value: ".ssh/authorized_keys" }  
+    - { key: "PermitEmptyPasswords" , value: "no" }  
+    - { key: "PasswordAuthentication" , value: "no" }  
+    - { key: "ChallengeResponseAuthentication" , value: "no" }  
+    - { key: "KerberosAuthentication" , value: "no" }  
+    - { key: "GSSAPIAuthentication" , value: "no" }  
+    - { key: "GSSAPICleanupCredentials" , value: "no" }  
+    - { key: "UsePAM" , value: "yes" }  
+    - { key: "X11Forwarding" , value: "no" }  
+    - { key: "PrintMotd" , value: "no" }  
+    - { key: "ClientAliveInterval" , value: "300" }  
+    - { key: "PermitUserEnvironment" , value: "no" }  
+    - { key: "ClientAliveCountMax" , value: "2" }  
+    - { key: "PermitTunnel" , value: "yes" }  
+    - { key: "AllowTcpForwarding" , value: "no" }  
+    - { key: "KexAlgorithms" , value: "curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256" }  
+    - { key: "Ciphers" , value: "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr" }  
+    - { key: "MACs" , value: "hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com" }                  
+    - { key: "AllowAgentForwarding" , value: "no" }  
+    - { key: "TCPKeepAlive" , value: "no" }  
+    - { key: "MaxSessions" , value: "2" }  
+    - { key: "LogLevel" , value: "VERBOSE" }
+    - { key: "Compression" , value: "no" }           
+...

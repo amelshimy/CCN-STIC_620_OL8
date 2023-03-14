@@ -1,0 +1,222 @@
+- name: CCN-STIC-620_12-Lynis-mejorando
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-12
+  tasks:
+    - name: Suggestion AUTH-9230
+      tags: AUTH-9230
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^{{ item }}'
+        line: "{{ item }}"
+      loop:
+        - "SHA_CRYPT_MIN_ROUNDS 5000"
+        - "SHA_CRYPT_MAX_ROUNDS 20000"  
+
+    - name: Suggestion AUTH-9328
+      tags: AUTH-9328
+      file:
+        path: "{{ item }}"
+        mode: '0640'
+      loop: 
+        - /etc/profile
+        - /etc/login.defs
+        - /etc/bashrc
+        - /etc/csh.cshrc
+        - /etc/init.d/functions
+
+    - name: Suggestion NETW-2705
+      lineinfile:
+        path: /etc/resolv.conf
+        regexp: '^{{ item }}'
+        line: "{{ item }}"
+      loop:
+        - "nameserver 169.254.169.254"
+        - "nameserver 208.67.222.222"   
+        - "nameserver 208.67.220.220"      
+
+    - name: Suggestion NETW-3200
+      tags: NETW-3200
+      block:
+        - name: Create CIS.config file
+          file: 
+            path: /etc/modprobe.d/CIS.conf
+            state: touch
+
+        - name: Edit CIS.config content
+          lineinfile:
+            path: /etc/modprobe.d/CIS.conf
+            regexp: '^{{ item }}'
+            line: "{{ item }}"
+          loop:
+            - "install dccp /bin/true"
+            - "install sctp /bin/true"   
+            - "install rds /bin/true"   
+            - "install tipc /bin/true"  
+
+    - name: Suggestion BANN-7126 | BANN-7130
+      tags: BANN-7126
+      block: 
+        - name: Delete file content
+          file: 
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /etc/issue
+            - /etc/issue.net 
+            - /etc/motd 
+        - name: Touch file content
+          file: 
+            path: "{{ item }}"
+            state: touch
+          loop:
+            - /etc/issue
+            - /etc/issue.net 
+            - /etc/motd             
+        - name: Add massege     
+          blockinfile:
+            path: "{{ item }}"
+            marker: ""
+            block: | 
+              ********************************************************************
+              *                                                                  *
+              * This system is for the use of authorized users only.  Usage of   *
+              * this system may be monitored and recorded by system personnel.   *
+              *                                                                  *
+              * Anyone using this system expressly consents to such monitoring   *
+              * and is advised that if such monitoring reveals possible          *
+              * evidence of criminal activity, system personnel may provide the  *
+              * evidence from such monitoring to law enforcement officials.      *
+              *                                                                  *
+              ********************************************************************
+          loop:
+            - /etc/issue
+            - /etc/issue.net
+            - /etc/motd        
+        - name: Add banner in SSHD_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            line: "Banner /etc/issue.net"
+            regexp: '^Banner'
+            insertafter: '^#Banner'
+
+        - name: Restart SSH service
+          systemd:
+            name: sshd 
+            state: restarted    
+
+    - name: Suggestion FILE-7524
+      tags: FILE-7524
+      block:
+        - name: Edit Ficheros CRON 
+          file: 
+            path: "{{ item }}"
+            mode: '0600'
+          loop:
+            - /etc/cron.deny
+            - /etc/crontab    
+
+        - name: Edit Directories CRON 
+          file: 
+            path: "{{ item }}"
+            mode: '0700'
+          loop:
+            - /etc/cron.d       
+            - /etc/cron.daily   
+            - /etc/cron.hourly  
+            - /etc/cron.weekly  
+            - /etc/cron.monthly 
+            
+    - name: Suggestion KRNL-6000
+      tags: KRNL-6000
+      block: 
+        - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '0'
+          sysctl:
+            name: "{{ item }}"
+            value: '0'
+            state: present
+            sysctl_file: /etc/sysctl.conf 
+            reload: true
+            sysctl_set: yes
+          loop: 
+            - net.ipv4.conf.all.send_redirects
+            - net.ipv4.conf.all.accept_redirects
+            - net.ipv4.conf.default.accept_redirects
+            - net.ipv4.conf.default.send_redirects
+            - net.ipv4.conf.default.secure_redirects
+            - net.ipv4.conf.all.secure_redirects
+            - net.ipv4.conf.all.accept_source_route
+            - net.ipv4.conf.default.accept_source_route
+            - net.ipv4.conf.default.rp_filter
+            - net.ipv6.conf.default.accept_source_route
+            - net.ipv6.conf.all.accept_source_route
+            - net.ipv6.conf.all.accept_redirects
+            - net.ipv6.conf.default.accept_ra
+            - net.ipv6.conf.all.accept_ra
+            - net.ipv6.conf.default.accept_redirects
+            - fs.suid_dumpable
+            - dev.tty.ldisc_autoload
+            - kernel.sysrq
+
+        - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '1'
+          sysctl:
+            name: "{{ item }}"
+            value: '1'
+            state: present
+            sysctl_file: /etc/sysctl.conf
+            reload: true
+            sysctl_set: yes
+          loop:
+            - net.ipv4.conf.default.log_martians
+            - net.ipv4.icmp_ignore_bogus_error_responses
+            - net.ipv4.icmp_echo_ignore_broadcasts
+            - net.ipv4.tcp_syncookies  
+            - kernel.dmesg_restrict
+            - kernel.modules_disabled
+            - net.ipv4.conf.all.log_martians
+
+        - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '2'
+          sysctl:
+            name: "{{ item }}"
+            value: '2'
+            state: present
+            sysctl_file: /etc/sysctl.conf
+            reload: true
+            sysctl_set: yes
+          loop:
+            - fs.protected_fifos
+            - fs.protected_regular
+            - kernel.kptr_restrict
+            - kernel.yama.ptrace_scope
+            - net.core.bpf_jit_harden
+
+        - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '3'
+          sysctl:
+            name: "{{ item }}"
+            value: '3'
+            state: present
+            sysctl_file: /etc/sysctl.conf
+            reload: true
+            sysctl_set: yes
+          loop:
+            - kernel.perf_event_paranoid                   
+
+    - name: Suggestion ACCT-9626
+      tags: ACCT-9626
+      block:
+        - name: Install sysstat package 
+          dnf: 
+            name: sysstat
+            state: latest 
+        - name: Start sysstat service 
+          systemd: 
+            name: sysstat 
+            state: started
+            enabled: true     
+
+
+
+
+

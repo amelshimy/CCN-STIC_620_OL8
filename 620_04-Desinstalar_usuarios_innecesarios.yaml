@@ -1,0 +1,47 @@
+---
+- name: CCN-STIC-620_04-Desinstalar_usuarios_innecesarios
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-04
+  tasks:
+    - name: Eliminar usuarios 
+      user: 
+        name: "{{ item }}"
+        remove: true
+        state: absent
+      loop:
+        - games
+        - floppy  
+
+    - name: Eliminar groups 
+      group: 
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - games
+        - floppy
+
+    - name: Register Usuarios 
+      shell: "awk -F: '( $3 >= 1 && $3 < 1000 ) { print $1 }' /etc/passwd"
+      register: SYS_users
+
+    - name: Cambiar shell usuarios de servicios 
+      user:
+        name: "{{ item }}"
+        shell: /bin/false
+      loop: 
+        - SYS_users
+
+    - name: Change users nobody | shutdown | halt 
+      user:
+        name: "{{ item.name }}" 
+        shell: "{{ item.shell }}" 
+      loop: 
+        - { name: 'root', shell: '/bin/false' } 
+        - { name: 'nobody', shell: '/bin/false' }  
+        - { name: 'shutdown', shell: '/sbin/shutdown' } 
+        - { name: 'halt', shell: '/sbin/halt' } 
+...
+    

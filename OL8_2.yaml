@@ -1,0 +1,1241 @@
+---
+- name: CCN-STIC-620_02-Parametros_del_kernel
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-02
+  tasks:
+    - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '0'
+      sysctl:
+        name: "{{ item }}"
+        value: '0'
+        state: present
+        sysctl_file: /etc/sysctl.conf 
+        reload: true
+        sysctl_set: yes
+      loop: 
+        - net.ipv4.conf.all.send_redirects
+        - net.ipv4.conf.all.accept_redirects
+        - net.ipv4.conf.default.accept_redirects
+        - net.ipv4.conf.default.send_redirects
+        - net.ipv4.conf.default.secure_redirects
+        - net.ipv4.conf.all.secure_redirects
+        - net.ipv4.conf.all.accept_source_route
+        - net.ipv4.conf.default.accept_source_route
+        - net.ipv4.conf.default.rp_filter
+        - net.ipv6.conf.default.accept_source_route
+        - net.ipv6.conf.all.accept_source_route
+        - net.ipv6.conf.all.accept_redirects
+        - net.ipv6.conf.default.accept_ra
+        - net.ipv6.conf.all.accept_ra
+        - net.ipv6.conf.default.accept_redirects
+        - fs.suid_dumpable
+        - dev.tty.ldisc_autoload
+        - kernel.sysrq
+
+    - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '1'
+      sysctl:
+        name: "{{ item }}"
+        value: '1'
+        state: present
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+        sysctl_set: yes
+      loop:
+        - net.ipv4.conf.all.log_martians
+        - net.ipv4.conf.default.log_martians
+        - net.ipv4.icmp_ignore_bogus_error_responses
+        - net.ipv4.icmp_echo_ignore_broadcasts
+        - net.ipv4.tcp_syncookies 
+        - kernel.dmesg_restrict
+
+        
+    - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '2'
+      sysctl:
+        name: "{{ item }}"
+        value: '2'
+        state: present
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+        sysctl_set: yes
+      loop:
+        - fs.protected_fifos
+        - fs.protected_regular
+        - kernel.kptr_restrict
+        - kernel.yama.ptrace_scope
+        - net.core.bpf_jit_harden
+    
+    - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '3'
+      sysctl:
+        name: "{{ item }}"
+        value: '3'
+        state: present
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+        sysctl_set: yes
+      loop:
+        - kernel.perf_event_paranoid        
+
+- name: CCN-STIC-620_03-Manipulacion_de_registros_de_actividad
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-03
+  tasks: 
+    - name: Install AUDIT package 
+      dnf: 
+        name: audit 
+        state: latest 
+    - name: Add rules 
+      blockinfile:
+        create: true
+        backup: true
+        path: /etc/audit/rules.d/audit.rules
+        state: present
+        block: |
+          # Elimina las reglas existentes
+          -D
+          # Cantidad de Buffer
+          ## Aumentar este parámetro si es necesario
+          -b 8192
+          # Modo de Fallo
+          ## Valores posibles: 0 (silencioso), 1 (printk, imprimir un mensaje de fallo), 2 (panic, detener el sistema)
+          -f 1
+          # Ignorar errores
+          ## p.ej. causado por usuarios o archivos no encontrados en el entorno local 
+          -i 
+          # Auditoría propia ----------------------------------------------- ----------------
+          ## Auditar los registros de auditoría
+          ### Intentos exitosos y no exitosos de leer información de los registros de auditoría
+          -w /var/log/audit/ -k auditlog
+          ## Configuración auditada
+          ### Modificaciones a la configuración de auditoría que ocurren mientras las funciones de recopilación de auditoría están operativas
+          -w /etc/audit/ -p wa -k auditconfig
+          -w /etc/libaudit.conf -p wa -k auditconfig
+          -w /etc/audisp/ -p wa -k audispconfig
+          ## Supervisar el uso de herramientas de gestión de auditoría
+          -w /sbin/auditctl -p x -k audittools
+          -w /sbin/auditd -p x -k audittools
+          ###########################################Filtros ---------------------------------------------------------------------
+          ## Ignorar los registros SELinux AVC
+          #-a always,exclude -F msgtype=AVC
+          ## Ignorar los registros actuales del directorio de trabajo
+          #-a always,exclude -F msgtype=CWD
+          ## Para no revisar cron si crea muchos registros
+          #-a never,user -F subj_type=crond_t
+          #-a exit,never -F subj_type=crond_t
+          ## Evita registros masivos de chrony
+          #-a never,exit -F arch=b64 -S adjtimex -F auid=unset -F uid=chrony -F subj_type=chronyd_t
+          ## Eliminar registros de VMWare tools
+          #-a exit,never -F arch=b32 -S fork -F success=0 -F path=/usr/lib/vmware-tools -F subj_type=initrc_t -F exit=-2
+          #-a exit,never -F arch=b64 -S fork -F success=0 -F path=/usr/lib/vmware-tools -F subj_type=initrc_t -F exit=-2
+          ### Filtro de eventos de alto volumen (especialmente en estaciones de trabajo Linux)
+          #-a exit,never -F arch=b32 -F dir=/dev/shm -k sharedmemaccess
+          #-a exit,never -F arch=b64 -F dir=/dev/shm -k sharedmemaccess
+          #-a exit,never -F arch=b32 -F dir=/var/lock/lvm -k locklvm
+          #-a exit,never -F arch=b64 -F dir=/var/lock/lvm -k locklvm
+          # Reglas -----------------------------------------------------------------------
+          ## Parámetros del kernel
+          -w /etc/sysctl.conf -p wa -k sysctl
+          ## Carga y descarga del módulo Kernel
+          -a always,exit -F perm=x -F auid!=-1 -F path=/sbin/insmod -k modules
+          -a always,exit -F perm=x -F auid!=-1 -F path=/sbin/modprobe -k modules
+          -a always,exit -F perm=x -F auid!=-1 -F path=/sbin/rmmod -k modules
+          -a always,exit -F arch=b64 -S finit_module -S init_module -S delete_module -F auid!=-1 -k modules
+          -a always,exit -F arch=b32 -S finit_module -S init_module -S delete_module -F auid!=-1 -k modules
+          ## Configuración Modprobe
+          -w /etc/modprobe.conf -p wa -k modprobe
+          ## Uso de KExec (todas las acciones)
+          -a always,exit -F arch=b64 -S kexec_load -k KEXEC
+          -a always,exit -F arch=b32 -S sys_kexec_load -k KEXEC
+          ## Archivos especiales
+          -a exit,always -F arch=b32 -S mknod -S mknodat -k specialfiles
+          -a exit,always -F arch=b64 -S mknod -S mknodat -k specialfiles
+          ## Operaciones de montaje 
+          -a always,exit -F arch=b64 -S mount -S umount2 -F auid!=-1 -k mount
+          -a always,exit -F arch=b32 -S mount -S umount -S umount2 -F auid!=-1 -k mount
+          # Cambios en swap 
+          -a always,exit -F arch=b64 -S swapon -S swapoff -F auid!=-1 -k swap
+          -a always,exit -F arch=b32 -S swapon -S swapoff -F auid!=-1 -k swap
+          ## Hora
+          -a exit,always -F arch=b32 -S adjtimex -S settimeofday -S clock_settime -k time
+          -a exit,always -F arch=b64 -S adjtimex -S settimeofday -S clock_settime -k time
+          ### Zona horaria local
+          -w /etc/localtime -p wa -k localtime
+          ## Stunnel
+          -w /usr/sbin/stunnel -p x -k stunnel
+          ## Configuración de Cron y trabajos programados
+          -w /etc/cron.allow -p wa -k cron
+          -w /etc/cron.deny -p wa -k cron
+          -w /etc/cron.d/ -p wa -k cron
+          -w /etc/cron.daily/ -p wa -k cron
+          -w /etc/cron.hourly/ -p wa -k cron
+          -w /etc/cron.monthly/ -p wa -k cron
+          -w /etc/cron.weekly/ -p wa -k cron
+          -w /etc/crontab -p wa -k cron
+          -w /var/spool/cron/crontabs/ -k cron
+          ## Bases de datos de usuarios, grupos y contraseñas
+          -w /etc/group -p wa -k etcgroup
+          -w /etc/passwd -p wa -k etcpasswd
+          -w /etc/gshadow -k etcgroup
+          -w /etc/shadow -k etcpasswd
+          -w /etc/security/opasswd -k opasswd
+          ## Cambios en el archivo Sudoers
+          -w /etc/sudoers -p wa -k actions
+          ## Passwd
+          -w /usr/bin/passwd -p x -k passwd_modification
+          ## Herramientas para cambiar identificadores de grupo
+          -w /usr/sbin/groupadd -p x -k group_modification
+          -w /usr/sbin/groupmod -p x -k group_modification
+          -w /usr/sbin/addgroup -p x -k group_modification
+          -w /usr/sbin/useradd -p x -k user_modification
+          -w /usr/sbin/usermod -p x -k user_modification
+          -w /usr/sbin/adduser -p x -k user_modification
+          ## Configuración e información de inicio de sesión
+          -w /etc/login.defs -p wa -k login
+          -w /etc/securetty -p wa -k login
+          -w /var/log/faillog -p wa -k login
+          -w /var/log/lastlog -p wa -k login
+          -w /var/log/tallylog -p wa -k login
+          ## Entorno de red
+          ### Cambios en el nombre de host
+          -a always,exit -F arch=b32 -S sethostname -S setdomainname -k network_modifications
+          -a always,exit -F arch=b64 -S sethostname -S setdomainname -k network_modifications
+          ### Cambios a otros archivos
+          -w /etc/hosts -p wa -k network_modifications
+          -w /etc/sysconfig/network -p wa -k network_modifications
+          -w /etc/network/ -p wa -k network
+          -a always,exit -F dir=/etc/NetworkManager/ -F perm=wa -k network_modifications
+          -w /etc/sysconfig/network -p wa -k network_modifications
+          ### Cambios para issue
+          -w /etc/issue -p wa -k etcissue
+          -w /etc/issue.net -p wa -k etcissue
+          ## Scripts de inicio del sistema
+          -w /etc/inittab -p wa -k init
+          -w /etc/init.d/ -p wa -k init
+          -w /etc/init/ -p wa -k init
+          ## Rutas de búsqueda de la biblioteca
+          -w /etc/ld.so.conf -p wa -k libpath
+          ## Configuración Pam
+          -w /etc/pam.d/ -p wa -k pam
+          -w /etc/security/limits.conf -p wa  -k pam
+          -w /etc/security/pam_env.conf -p wa -k pam
+          -w /etc/security/namespace.conf -p wa -k pam
+          -w /etc/security/namespace.init -p wa -k pam
+          ## Configuración de postfix
+          -w /etc/aliases -p wa -k mail
+          -w /etc/postfix/ -p wa -k mail
+          ## Configuración SSH
+          -w /etc/ssh/sshd_config -k sshd
+          # Systemd
+          -w /bin/systemctl -p x -k systemd 
+          -w /etc/systemd/ -p wa -k systemd
+          ## Eventos SELinux que modifican los controles de acceso obligatorios (MAC) del sistema
+          -w /etc/selinux/ -p wa -k mac_policy
+          ## Fallas de acceso a elementos críticos
+          -a exit,always -F arch=b64 -S open -F dir=/etc -F success=0 -k unauthedfileaccess
+          -a exit,always -F arch=b64 -S open -F dir=/bin -F success=0 -k unauthedfileaccess
+          -a exit,always -F arch=b64 -S open -F dir=/sbin -F success=0 -k unauthedfileaccess
+          -a exit,always -F arch=b64 -S open -F dir=/usr/bin -F success=0 -k unauthedfileaccess
+          -a exit,always -F arch=b64 -S open -F dir=/usr/sbin -F success=0 -k unauthedfileaccess
+          -a exit,always -F arch=b64 -S open -F dir=/var -F success=0 -k unauthedfileaccess
+          -a exit,always -F arch=b64 -S open -F dir=/home -F success=0 -k unauthedfileaccess
+          -a exit,always -F arch=b64 -S open -F dir=/srv -F success=0 -k unauthedfileaccess
+          ## Solicitudes de cambio de ID de proceso (cambio de cuentas)
+          -w /bin/su -p x -k priv_esc
+          -w /usr/bin/sudo -p x -k priv_esc
+          -w /etc/sudoers -p rw -k priv_esc
+          ## Estado de energía
+          -w /sbin/shutdown -p x -k power
+          -w /sbin/poweroff -p x -k power
+          -w /sbin/reboot -p x -k power
+          -w /sbin/halt -p x -k power
+          ## Información de inicio de sesión
+          -w /var/run/utmp -p wa -k session
+          -w /var/log/btmp -p wa -k session
+          -w /var/log/wtmp -p wa -k session
+          ## Modificaciones de control de acceso discrecional (DAC)
+          -a always,exit -F arch=b32 -S chmod -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S chown -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S fchmod -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S fchmodat -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S fchown -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S fchownat -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S fremovexattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S fsetxattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S lchown -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S lremovexattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S lsetxattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S removexattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b32 -S setxattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S chmod  -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S chown -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S fchmod -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S fchmodat -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S fchown -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S fchownat -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S fremovexattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S fsetxattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S lchown -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S lremovexattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S lsetxattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S removexattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          -a always,exit -F arch=b64 -S setxattr -F auid>=500 -F auid!=4294967295 -k perm_mod
+          # Reglas especiales ----------------------------------------------- ----------------
+          ## Explotación API de 32 bits
+          ### Si su sistema es de 64 bits, todo debe estar ejecutándose en modo de 64 bits.
+          ### Esta regla detectará cualquier uso de las llamadas al sistema de 32 bits.
+          ### Esto podría ser una señal de que alguien está explotando un bug en el sistema de 32 bits.
+          -a always,exit -F arch=b32 -S all -k 32bit_api
+          ## Reconocimiento
+          -w /usr/bin/whoami -p x -k recon
+          -w /etc/issue -p r -k recon
+          -w /etc/hostname -p r -k recon
+          ## Actividades sospechosas
+          -w /usr/bin/wget -p x -k susp_activity
+          -w /usr/bin/curl -p x -k susp_activity
+          -w /usr/bin/base64 -p x -k susp_activity
+          -w /bin/nc -p x -k susp_activity
+          -w /bin/netcat -p x -k susp_activity
+          -w /usr/bin/ncat -p x -k susp_activity
+          -w /usr/bin/ssh -p x -k susp_activity
+          -w /usr/bin/socat -p x -k susp_activity
+          -w /usr/bin/wireshark -p x -k susp_activity
+          -w /usr/bin/rawshark -p x -k susp_activity
+          -w /usr/bin/rdesktop -p x -k sbin_susp
+          -w /sbin/iptables -p x -k sbin_susp 
+          -w /sbin/ifconfig -p x -k sbin_susp
+          -w /usr/sbin/tcpdump -p x -k sbin_susp
+          -w /usr/sbin/traceroute -p x -k sbin_susp
+          ## Inyección
+          ### Estas reglas vigilan la inyección de código por parte de la instalación de ptrace.
+          -a always,exit -F arch=b32 -S ptrace -k tracing
+          -a always,exit -F arch=b64 -S ptrace -k tracing
+          -a always,exit -F arch=b32 -S ptrace -F a0=0x4 -k code_injection
+          -a always,exit -F arch=b64 -S ptrace -F a0=0x4 -k code_injection
+          -a always,exit -F arch=b32 -S ptrace -F a0=0x5 -k data_injection
+          -a always,exit -F arch=b64 -S ptrace -F a0=0x5 -k data_injection
+          -a always,exit -F arch=b32 -S ptrace -F a0=0x6 -k register_injection
+          -a always,exit -F arch=b64 -S ptrace -F a0=0x6 -k register_injection
+          ## Abuso de privilegios
+          ### El propósito de esta regla es detectar cuándo un administrador accede al directorio de inicio de los usuarios comunes.
+          -a always,exit -F dir=/home -F uid=0 -F auid>=1000 -F auid!=4294967295 -C auid!=obj_uid -k power_abuse
+          # Gestión de software ---------------------------------------------------------
+          # RPM (CentOS)
+          -w /usr/bin/rpm -p x -k software_mgmt
+          -w /usr/bin/yum -p x -k software_mgmt
+          -w /usr/bin/dnf -p x -k software_mgmt
+          # Software especial ----------------------------------------------- -------------
+          ## Secretos específicos de GDS
+          #-w /etc/puppet/ssl -p wa -k puppet_ssl
+          ## IBM Bigfix BESClient
+          #-a exit,always -F arch=b64 -S open -F dir=/opt/BESClient -F success=0 -k soft_besclient
+          #-w /var/opt/BESClient/ -p wa -k soft_besclient
+          # Eventos de gran volumen ---------------------------------------------- ------------
+          ## ELIMINAR SI SE CAUSA UN VOLUMEN EXCESIVO EN EL SISTEMA
+          ## Ejecuciones de comandos root
+          -a exit,always -F arch=b64 -F euid=0 -S execve -k rootcmd
+          -a exit,always -F arch=b32 -F euid=0 -S execve -k rootcmd
+          ## Eventos de eliminación de archivos por usuario
+          -a always,exit -F arch=b32 -S rmdir -S unlink -S unlinkat -S rename -S renameat -F auid>=500 -F auid!=4294967295 -k delete
+          -a always,exit -F arch=b64 -S rmdir -S unlink -S unlinkat -S rename -S renameat -F auid>=500 -F auid!=4294967295 -k delete
+          ## Acceso a archivos
+          ### Acceso no autorizado (sin éxito)
+          -a always,exit -F arch=b32 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EACCES -F auid>=500 -F auid!=4294967295 -k file_access
+          -a always,exit -F arch=b32 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EPERM -F auid>=500 -F auid!=4294967295 -k file_access
+          -a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EACCES -F auid>=500 -F auid!=4294967295 -k file_access
+          -a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EPERM -F auid>=500 -F auid!=4294967295 -k file_access
+          ### Creación fallida
+          -a always,exit -F arch=b32 -S creat,link,mknod,mkdir,symlink,mknodat,linkat,symlinkat -F exit=-EACCES -k file_creation
+          -a always,exit -F arch=b64 -S mkdir,creat,link,symlink,mknod,mknodat,linkat,symlinkat -F exit=-EACCES -k file_creation
+          -a always,exit -F arch=b32 -S link,mkdir,symlink,mkdirat -F exit=-EPERM -k file_creation
+          -a always,exit -F arch=b64 -S mkdir,link,symlink,mkdirat -F exit=-EPERM -k file_creation
+          ### Modificación fallida
+          -a always,exit -F arch=b32 -S rename -S renameat -S truncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EACCES -k file_modification
+          -a always,exit -F arch=b64 -S rename -S renameat -S truncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EACCES -k file_modification
+          -a always,exit -F arch=b32 -S rename -S renameat -S truncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EPERM -k file_modification
+          -a always,exit -F arch=b64 -S rename -S renameat -S truncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EPERM -k file_modification
+          # Hacer la configuración inmutable --------------------------------------------
+          ## - e 2
+    - name: Mode audit.conf file 
+      file:
+        path: /etc/audit/auditd.conf
+        mode: "0600" 
+        owner: root
+        group: root 
+
+    - name: audit fichero de configuración [file size]
+      lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: "^max_log_file = "
+        line: max_log_file = 10
+
+    - name: audit fichero de configuración [file count]
+      lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: "^num_logs"
+        line: num_logs = 5
+    - name: audit fichero de configuración [file rotation]
+      lineinfile:
+        path: /etc/audit/auditd.conf
+        regexp: "^max_log_file_action = "
+        line: max_log_file_action = ROTATE   
+      notify: auditd_service 
+    - name: Enable & start AUDIT service 
+      systemd: 
+        name: auditd 
+        state: started
+        enabled: true      
+  
+- name: CCN-STIC-620_04-Desinstalar_usuarios_innecesarios
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-04
+  tasks:
+    - name: Eliminar usuarios 
+      user: 
+        name: "{{ item }}"
+        remove: true
+        state: absent
+      loop:
+#        - games
+        - floppy    
+    - name: Eliminar groups 
+      group: 
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - games
+        - floppy
+
+    - name: Register Usuarios 
+      shell: "awk -F: '( $3 >= 1 && $3 < 1000 ) { print $1 }' /etc/passwd"
+      register: SYS_users
+
+    - name: Cambiar shell usuarios de servicios 
+      user:
+        name: "{{ item }}"
+        shell: /bin/false
+      loop: 
+        - SYS_users
+    - name: Change users nobody | shutdown | halt 
+      user:
+        name: "{{ item.name }}" 
+        shell: "{{ item.shell }}" 
+      loop: 
+        - { name: 'root', shell: '/bin/false' } 
+        - { name: 'nobody', shell: '/bin/false' }  
+        - { name: 'shutdown', shell: '/sbin/shutdown' } 
+        - { name: 'halt', shell: '/sbin/halt' } 
+
+- name: CCN-STIC-620_05-Intentos_fallidos
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-05
+  tasks:
+    - name: password-auth Auth 1
+      pamd:
+        name: password-auth
+        type: auth
+        control: required
+        module_path: pam_env.so
+        backup: true 
+
+    - name: password-auth Auth 2
+      pamd:
+        name: password-auth
+        type: auth
+        control: required
+        module_path: pam_faillock.so
+        module_arguments: 'preauth silent audit deny=8 even_deny_root unlock_time=0'
+        state: updated  
+        backup: true 
+    - name: password-auth Auth 3
+      pamd:
+        name: password-auth
+        type: auth
+        control: sufficient
+        module_path: pam_unix.so
+        module_arguments: 'try_first_pass nullok'
+        state: updated 
+        backup: true 
+    - name: password-auth Auth 4
+      pamd:
+        name: password-auth
+        type: auth
+        control: required
+        module_path: pam_faillock.so
+        module_arguments: 'preauth silent audit deny=8 even_deny_root unlock_time=0'
+        state: updated  
+    - name: password-auth Auth 5
+      pamd:
+        name: password-auth
+        type: auth
+        control: required
+        module_path: pam_deny.so
+        state: updated  
+    - name: password-auth Account 1
+      pamd: 
+        name: password-auth
+        type: account
+        control: required
+        module_path: "{{ item }}"
+        state: absent 
+      loop:
+        - pam_access.so
+        - pam_unix.so
+    - name: password-auth Account 2
+      pamd: 
+        name: password-auth
+        type: account
+        control: required
+        module_path: pam_faillock.so
+        new_type: account
+        new_control: required
+        new_module_path: pam_unix.so
+        state: before 
+    - name: password-auth Password 1
+      pamd:
+        name: password-auth
+        type: password
+        control: requisite
+        module_path: pam_pwquality.so
+        module_arguments: 'try_first_pass local_users_only retry=3 authtok_type='
+        state: updated 
+    - name: password-auth Password 2
+      pamd:
+        name: password-auth
+        type: password
+        control: requisite
+        module_path: pam_pwhistory.so
+        module_arguments: 'debug use_authtok remember=24 retry=3'
+        state: updated 
+    - name: password-auth Password 3
+      pamd:
+        name: password-auth
+        type: password
+        control: sufficient
+        module_path: pam_unix.so
+        module_arguments: 'try_first_pass use_authtok nullok sha512 shadow'
+        state: updated 
+    - name: password-auth Password 4
+      pamd:
+        name: password-auth
+        type: password
+        control: required
+        module_path: pam_deny.so
+        state: updated 
+    - name: password-auth Session 1
+      pamd:
+        name: password-auth
+        type: session
+        control: optional
+        module_path: pam_keyinit.so
+        module_arguments: 'revoke'
+        state: updated 
+    - name: password-auth Session 2
+      pamd:
+        name: password-auth
+        type: session
+        control: required
+        module_path: pam_limites.so
+        state: updated         
+    - name: password-auth Session 3
+      pamd:
+        name: password-auth
+        type: session
+        control: optional
+        module_path: pam_systemd.so
+        state: updated 
+    - name: password-auth Session 4
+      pamd:
+        name: password-auth
+        type: session
+        control: '[success=1 default=ignore]'
+        module_path: pam_succeed_if.so
+        module_arguments: 'service in crond quiet use_uid'
+        state: updated 
+    - name: password-auth Session 5
+      pamd:
+        name: password-auth
+        type: session
+        control: required
+        module_path: pam_unix.so
+        state: updated 
+    - name: system-auth Auth 1
+      pamd: 
+        name: system-auth
+        type: auth
+        control: required
+        module_path: pam_env.so
+        state: updated 
+    - name: system-auth Auth 2
+      pamd: 
+        name: system-auth
+        type: auth
+        control: required
+        module_path: pam_faillock.so
+        module_arguments: 'preauth silent audit deny=8'
+        state: updated 
+    - name: system-auth Auth 3
+      pamd: 
+        name: system-auth
+        type: auth
+        control: sufficient
+        module_path: pam_unix.so
+        module_arguments: 'try_first_pass nullok'
+        state: updated 
+    - name: system-auth Auth 4
+      pamd: 
+        name: system-auth
+        type: auth
+        control: '[default=die]'
+        module_path: pam_faillock.so
+        module_arguments: 'authfail audit deny=8'
+        state: updated 
+    - name: system-auth Auth 5
+      pamd: 
+        name: system-auth
+        type: auth
+        control: required
+        module_path: pam_deny.so
+        state: updated 
+    - name: system-auth Auth 6
+      pamd: 
+        name: system-auth
+        type: auth
+        control: required
+        module_path: pam_faildelay.so
+        module_arguments: 'delay=2000000'
+        state: absent
+    - name: system-auth Account 1
+      pamd: 
+        name: system-auth
+        type: account
+        control: required
+        module_path: "{{ item }}"
+        state: absent 
+      loop:
+        - pam_access.so
+        - pam_unix.so
+    - name: system-auth Account 2 
+      pamd: 
+        name: system-auth
+        type: account
+        control: required
+        module_path: pam_faillock.so
+        new_type: account
+        new_control: required
+        new_module_path: pam_unix.so
+        state: before 
+    - name: system-auth Password 1 
+      pamd: 
+        name: system-auth
+        type: password
+        control: requisite
+        module_path: pam_pwquality.so
+        module_arguments: 'try_first_pass local_users_only retry=3 authtok_type='
+        state: updated 
+    - name: system-auth Password 2 
+      pamd: 
+        name: system-auth
+        type: password
+        control: requisite
+        module_path: pam_pwhistory.so
+        module_arguments: 'debug use_authtok remember=24 retry=3'
+        new_type: password 
+        new_control: requisite 
+        new_module_path: pam_pwquality.so
+        state: before
+    - name: system-auth Password 3 
+      pamd: 
+        name: system-auth
+        type: password
+        control: sufficient
+        module_path: pam_unix.so
+        module_arguments: 'try_first_pass use_authtok nullok sha512 shadow'
+        state: updated 
+    - name: system-auth Password 4 
+      pamd: 
+        name: system-auth
+        type: password
+        control: required
+        module_path: pam_deny.so
+        state: updated 
+    - name: system-auth Session 1  
+      pamd: 
+        name: system-auth
+        type: session
+        control: optional
+        module_path: pam_keyinit.so
+        module_arguments: 'revoke'
+        state: updated 
+    - name: system-auth Session 2  
+      pamd: 
+        name: system-auth
+        type: session
+        control: required
+        module_path: pam_limits.so
+        state: updated 
+    - name: system-auth Session 3  
+      pamd: 
+        name: system-auth
+        type: -session
+        control: optional
+        module_path: pam_systemd.so
+        state: updated 
+    - name: system-auth Session 4  
+      pamd: 
+        name: system-auth
+        type: session
+        control: '[success=1 default=ignore]'
+        module_path: pam_succeed_if.so
+        module_arguments: 'service in crond quiet use_uid'
+        state: updated 
+    - name: system-auth Session 5  
+      pamd: 
+        name: system-auth
+        type: session
+        control: required
+        module_path: pam_unix.so
+        state: updated 
+
+- name: CCN-STIC-620_06-Limites_permisos_y_cad_contraseдas
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-06
+  tasks:
+    - name: Configure limites 
+      blockinfile:
+        backup: true
+        path: /etc/security/limits.conf
+        state: present 
+        block: |
+          *               soft   nofile    4096 
+          *               hard   nofile    65536
+          *               soft   nproc     4096 
+          *               hard   nproc     4096 
+          *               soft   locks     4096 
+          *               hard   locks     4096 
+          *               soft   stack     10240
+          *               hard   stack     32768
+          *               soft   memlock   64
+          *               hard   memlock   64
+          *               soft   maxlogins 5
+          # Límite soft 32GB, hard 64GB
+          *               soft   fsize     33554432
+          *               hard   fsize     67108864
+          # Límites para root
+          root            soft   nofile    4096
+          root            hard   nofile    65536
+          root            soft   nproc     4096
+          root            hard   nproc     4096
+          root            soft    stack     10240
+          root            hard   stack     32768
+          root            soft   fsize     33554432
+          root            hard   maxlogins 0
+    - name: PASS_MAX_DAYS
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_MAX_DAYS'
+        line: PASS_MAX_DAYS  45         
+    - name: PASS_MIN_DAYS
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_MIN_DAYS'
+        line: PASS_MIN_DAYS  2
+    - name: PASS_WARN_AGE     
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^PASS_WARN_AGE'
+        line: PASS_WARN_AGE  10
+
+- name: CCN-STIC-620_08-Limitacion_usb
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-08
+  tasks:
+    - name: Install usbguard package 
+      dnf: 
+        name: usbguard
+        state: latest
+    - name: Start usbguard service
+      systemd:
+        name: usbguard
+        state: started
+        enabled: true     
+    - name: Comentar los prametros por defecto
+      lineinfile:
+        path: /etc/usbguard/usbguard-daemon.conf
+        regexp: '^{{ item }}'
+        line: "#{{ item }}"
+        backup: false
+      notify: usbguard.service  
+      loop:
+        - "PresentControllerPolicy=keep"
+    - name: Definir los prametros
+      lineinfile:
+        path: /etc/usbguard/usbguard-daemon.conf
+        regexp: '^{{ item }}'
+        line: "{{ item }}"
+        insertafter: '^#{{ item }}'
+        backup: true 
+      notify: usbguard.service  
+      loop:
+        - "RuleFile=/etc/usbguard/rules.conf"
+        - "ImplicitPolicyTarget=block"
+        - "PresentDevicePolicy=apply-policy"
+        - "PresentControllerPolicy=apply-policy"
+        - "InsertedDevicePolicy=apply-policy"
+        - "RestoreControllerDeviceState=false"
+        - "DeviceManagerBackend=uevent"
+        - "IPCAllowedUsers=root opc"
+        - "IPCAllowedGroups=wheel" 
+        - "IPCAccessControlFiles=/etc/usbguard/IPCAccessControl.d/"
+        - "DeviceRulesWithPort=false"
+        - "AuditBackend=FileAudit"
+        - "AuditFilePath=/var/log/usbguard/usbguard-audit.log"
+  handlers:
+    - name: usbguard.service
+      systemd:
+        name: usbguard
+        state: restarted
+
+- name: CCN-STIC-620_09-Parametros_SSH
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-09
+  tasks:
+    - name: MODIFICANDO CONFIGURACION SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^{{ item.key }}'
+        line: "{{ item.key}} {{ item.value }}"
+        backup: true 
+      notify: sshd_service  
+      loop:
+        - { key: "Port" , value: "22" }  
+        - { key: "Protocol" , value: "2" }  
+        - { key: "SyslogFacility" , value: "AUTHPRIV" }  
+        - { key: "LoginGraceTime" , value: "2m" }  
+        - { key: "PermitRootLogin" , value: "no" }  
+        - { key: "MaxAuthTries" , value: "3" }  
+        - { key: "AuthorizedKeysFile" , value: ".ssh/authorized_keys" }  
+        - { key: "PermitEmptyPasswords" , value: "no" }  
+        - { key: "PasswordAuthentication" , value: "no" }  
+        - { key: "ChallengeResponseAuthentication" , value: "no" }  
+        - { key: "KerberosAuthentication" , value: "no" }  
+        - { key: "GSSAPIAuthentication" , value: "no" }  
+        - { key: "GSSAPICleanupCredentials" , value: "no" }  
+        - { key: "UsePAM" , value: "yes" }  
+        - { key: "X11Forwarding" , value: "no" }  
+        - { key: "PrintMotd" , value: "no" }  
+        - { key: "Compression" , value: "no" }
+        - { key: "ClientAliveInterval" , value: "300" }  
+        - { key: "PermitUserEnvironment" , value: "no" }  
+        - { key: "ClientAliveCountMax" , value: "2" }  
+        - { key: "PermitTunnel" , value: "yes" }  
+        - { key: "AllowTcpForwarding" , value: "no" }  
+        - { key: "KexAlgorithms" , value: "curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256" }  
+        - { key: "Ciphers" , value: "chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr" }  
+        - { key: "MACs" , value: "hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com" }                  
+        - { key: "AllowAgentForwarding" , value: "no" }  
+        - { key: "TCPKeepAlive" , value: "no" }  
+        - { key: "MaxSessions" , value: "2" }  
+        - { key: "LogLevel" , value: "VERBOSE" }   
+  handlers:
+    - name: sshd_service 
+      systemd:
+        name: sshd 
+        state: restarted
+
+- name: CCN-STIC-620_10-Elementos_innecesarios
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-10
+  tasks:
+    - name: Desinstalar paquetes de servidores 
+      dnf:
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - xinetd
+        - xorg-x11-server-common
+        - avahi-autoipd
+        - avahi
+        - cups
+        - dhcp-server
+        - bind
+        - ftp
+        - vsftpd
+        - tftp-server
+        - dovecot
+        - cyrus-imapd
+        - samba
+        - squid
+        - net-snmp
+        - ypserv
+        - telnet-server
+        - rsync
+        - ypbind
+        - rsh
+        - talk
+        - tftp
+    - name: Configurar limites_archivos.conf
+      lineinfile:
+        path: /etc/modprobe.d/limites_archivos.conf
+        create: true
+        line: "{{ item }}"
+      loop:
+        - install cramfs /bin/true
+        - install freevxfs /bin/true
+        - install jffs2 /bin/true
+        - install hfs /bin/true
+        - install hfsplus /bin/true
+        - install squashfs /bin/true
+        - install udf /bin/true
+        - '#Comentar en caso de instalacion EFI'
+        - install fat /bin/true
+        - '#Comentar en caso de instalacion EFI'
+        - install vfat /bin/true
+        - install cifs /bin/true
+        - install nfs /bin/true
+        - install nfsv3 /bin/true
+        - install nfsv4 /bin/true
+        - install gfs2 /bin/true
+        - install bnep /bin/true
+        - install bluetooth /bin/true
+        - install btusb /bin/true
+        - install net-pf-31 /bin/true  
+    - name: Desabilitar servicios innecesarios
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false 
+        masked: true 
+      ignore_errors: true  
+      loop: 
+        - bluetooth.target
+        - printer.target
+        - remote-fs.target
+        - rpcbind.target
+        - runlevel4.target
+        - runlevel5.target
+        - runlevel6.target
+        - smartcard.target
+        - sound.target
+        - console-getty.service
+        - debug-shell.service
+        - rdisc.service
+        - ctrl-alt-del.target
+        - iprutils.target
+        - fstrim.timer
+        - container-getty@.service 
+        - console-getty.service
+        - kexec.target
+        - cpupower.service
+        - ebtables.service
+        - dbus-org.freedesktop.hostname1.service
+        - dbus-org.freedesktop.portable1.service
+        - debug-shell.service
+        - dracut-cmdline.service
+        - dracut-initqueue.service
+        - dracut-mount.service
+        - dracut-pre-mount.service
+        - dracut-pre-pivot.service
+        - dracut-pre-trigger.service
+        - dracut-pre-udev.service
+        - dracut-shutdown.service
+        - getty@.service
+        - import-state.service
+        - iprdump.service
+        - iprinit.service
+        - iprupdate.service
+        - kmod-static-nodes.service
+        - loadmodules.service
+        - nftables.service
+        - nis-domainname.service
+        - plymouth-halt.service
+        - plymouth-kexec.service
+        - plymouth-poweroff.service
+        - plymouth-quit-wait.service
+        - plymouth-quit.service
+        - plymouth-read-write.service
+        - plymouth-reboot.service
+        - plymouth-start.service
+        - plymouth-switch-root.service
+        - rdisc.service
+        - rescue.service
+        - serial-getty@.service
+        - systemd-resolved.service
+        - tuned.service
+    - name: BLOQUEARÁN LOS COMPILADORES DEL SISTEMA
+      file: 
+        path: '{{ item }}'
+        mode: '0000'
+      ignore_errors: true
+      loop:
+        - /usr/bin/byacc
+        - /usr/bin/yacc
+        - /usr/bin/bcc
+        - /usr/bin/kgcc
+        - /usr/bin/cc
+        - /usr/bin/gcc
+        - /usr/bin/'*c++'
+        - /usr/bin/'*g++' 
+
+- name: CCN-STIC-620_11-Paquetes_huerfanos
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-11
+  tasks:  
+    - name: Paquete yum-utils
+      dnf: 
+        name: yum-utils
+        state: latest
+    - name: Paquetes huerfanos 
+      dnf: 
+        autoremove: true 
+    - name: Paquetes orphans | leaves 
+      command: 
+        cmd: dnf remove -y package-cleanup
+    - name: Remove old installed paquetes
+      ignore_errors: true
+      command:  
+        cmd: dnf remove -y --oldinstallonly
+
+- name: CCN-STIC-620_12-Lynis-mejorando
+  hosts: all
+  become: true 
+  gather_facts: yes
+  tags: 
+    - 620-12
+  tasks:
+    - name: Suggestion AUTH-9230
+      tags: AUTH-9230
+      lineinfile:
+        path: /etc/login.defs
+        regexp: '^{{ item }}'
+        line: "{{ item }}"
+      loop:
+        - "SHA_CRYPT_MIN_ROUNDS 5000"
+        - "SHA_CRYPT_MAX_ROUNDS 20000"  
+
+    - name: Suggestion AUTH-9328
+      tags: AUTH-9328
+      file:
+        path: "{{ item }}"
+        mode: '0640'
+      loop: 
+        - /etc/profile
+        - /etc/login.defs
+        - /etc/bashrc
+        - /etc/csh.cshrc
+        - /etc/init.d/functions
+
+    - name: Suggestion NETW-2705
+      lineinfile:
+        path: /etc/resolv.conf
+        regexp: '^{{ item }}'
+        line: "{{ item }}"
+      loop:
+        - "nameserver 169.254.169.254"
+        - "nameserver 208.67.222.222"   
+        - "nameserver 208.67.220.220"      
+
+    - name: Suggestion NETW-3200
+      tags: NETW-3200
+      block:
+        - name: Create CIS.config file
+          file: 
+            path: /etc/modprobe.d/CIS.conf
+            state: touch
+
+        - name: Edit CIS.config content
+          lineinfile:
+            path: /etc/modprobe.d/CIS.conf
+            regexp: '^{{ item }}'
+            line: "{{ item }}"
+          loop:
+            - "install dccp /bin/true"
+            - "install sctp /bin/true"   
+            - "install rds /bin/true"   
+            - "install tipc /bin/true"  
+
+    - name: Suggestion BANN-7126 | BANN-7130
+      tags: BANN-7126
+      block: 
+        - name: Delete file content
+          file: 
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /etc/issue
+            - /etc/issue.net 
+            - /etc/motd 
+        - name: Touch file content
+          file: 
+            path: "{{ item }}"
+            state: touch
+          loop:
+            - /etc/issue
+            - /etc/issue.net 
+            - /etc/motd             
+        - name: Add massege     
+          blockinfile:
+            path: "{{ item }}"
+            marker: ""
+            block: | 
+              ********************************************************************
+              *                                                                  *
+              * This system is for the use of authorized users only.  Usage of   *
+              * this system may be monitored and recorded by system personnel.   *
+              *                                                                  *
+              * Anyone using this system expressly consents to such monitoring   *
+              * and is advised that if such monitoring reveals possible          *
+              * evidence of criminal activity, system personnel may provide the  *
+              * evidence from such monitoring to law enforcement officials.      *
+              *                                                                  *
+              ********************************************************************
+          loop:
+            - /etc/issue
+            - /etc/issue.net
+            - /etc/motd        
+        - name: Add banner in SSHD_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            line: "Banner /etc/issue.net"
+            regexp: '^Banner'
+            insertafter: '^#Banner'
+
+        - name: Restart SSH service
+          systemd:
+            name: sshd 
+            state: restarted    
+
+    - name: Suggestion FILE-7524
+      tags: FILE-7524
+      block:
+        - name: Edit Ficheros CRON 
+          file: 
+            path: "{{ item }}"
+            mode: '0600'
+          loop:
+            - /etc/cron.deny
+            - /etc/crontab    
+
+        - name: Edit Directories CRON 
+          file: 
+            path: "{{ item }}"
+            mode: '0700'
+          loop:
+            - /etc/cron.d       
+            - /etc/cron.daily   
+            - /etc/cron.hourly  
+            - /etc/cron.weekly  
+            - /etc/cron.monthly 
+            
+    - name: Suggestion KRNL-6000
+      tags: KRNL-6000
+      block: 
+        - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '0'
+          sysctl:
+            name: "{{ item }}"
+            value: '0'
+            state: present
+            sysctl_file: /etc/sysctl.conf 
+            reload: true
+            sysctl_set: yes
+          loop: 
+            - net.ipv4.conf.all.send_redirects
+            - net.ipv4.conf.all.accept_redirects
+            - net.ipv4.conf.default.accept_redirects
+            - net.ipv4.conf.default.send_redirects
+            - net.ipv4.conf.default.secure_redirects
+            - net.ipv4.conf.all.secure_redirects
+            - net.ipv4.conf.all.accept_source_route
+            - net.ipv4.conf.default.accept_source_route
+            - net.ipv4.conf.default.rp_filter
+            - net.ipv6.conf.default.accept_source_route
+            - net.ipv6.conf.all.accept_source_route
+            - net.ipv6.conf.all.accept_redirects
+            - net.ipv6.conf.default.accept_ra
+            - net.ipv6.conf.all.accept_ra
+            - net.ipv6.conf.default.accept_redirects
+            - fs.suid_dumpable
+            - dev.tty.ldisc_autoload
+            - kernel.sysrq
+
+        - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '1'
+          sysctl:
+            name: "{{ item }}"
+            value: '1'
+            state: present
+            sysctl_file: /etc/sysctl.conf
+            reload: true
+            sysctl_set: yes
+          loop:
+            - net.ipv4.conf.default.log_martians
+            - net.ipv4.icmp_ignore_bogus_error_responses
+            - net.ipv4.icmp_echo_ignore_broadcasts
+            - net.ipv4.tcp_syncookies  
+            - kernel.dmesg_restrict
+#            - kernel.modules_disabled
+            - net.ipv4.conf.all.log_martians
+
+        - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '2'
+          sysctl:
+            name: "{{ item }}"
+            value: '2'
+            state: present
+            sysctl_file: /etc/sysctl.conf
+            reload: true
+            sysctl_set: yes
+          loop:
+            - fs.protected_fifos
+            - fs.protected_regular
+            - kernel.kptr_restrict
+            - kernel.yama.ptrace_scope
+            - net.core.bpf_jit_harden
+
+        - name: APLICANDO PARÁMETROS DEL KERNEL VALORES '3'
+          sysctl:
+            name: "{{ item }}"
+            value: '3'
+            state: present
+            sysctl_file: /etc/sysctl.conf
+            reload: true
+            sysctl_set: yes
+          loop:
+            - kernel.perf_event_paranoid                   
+
+    - name: Suggestion ACCT-9626
+      tags: ACCT-9626
+      block:
+        - name: Install sysstat package 
+          dnf: 
+            name: sysstat
+            state: latest 
+        - name: Start sysstat service 
+          systemd: 
+            name: sysstat 
+            state: started
+            enabled: true     
+
+...      

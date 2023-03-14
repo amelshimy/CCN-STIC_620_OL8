@@ -1,0 +1,16 @@
+--- 
+- name: Paquete yum-utils
+  dnf: 
+    name: yum-utils
+    state: latest
+- name: Paquetes huerfanos 
+  dnf: 
+    autoremove: true 
+- name: Paquetes orphans | leaves 
+  command: 
+    cmd: dnf remove -y package-cleanup
+- name: Remove old installed paquetes
+  ignore_errors: true
+  command:  
+    cmd: dnf remove -y --oldinstallonly
+...

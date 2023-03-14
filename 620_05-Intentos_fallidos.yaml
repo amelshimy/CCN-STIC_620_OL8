@@ -1,0 +1,272 @@
+---
+
+- name: password-auth Auth 1
+  pamd:
+    name: password-auth
+    type: auth
+    control: required
+    module_path: pam_env.so
+    backup: true 
+    
+- name: password-auth Auth 2
+  pamd:
+    name: password-auth
+    type: auth
+    control: required
+    module_path: pam_faillock.so
+    module_arguments: 'preauth silent audit deny=8 even_deny_root unlock_time=0'
+    state: updated  
+    backup: true 
+- name: password-auth Auth 3
+  pamd:
+    name: password-auth
+    type: auth
+    control: sufficient
+    module_path: pam_unix.so
+    module_arguments: 'try_first_pass nullok'
+    state: updated 
+    backup: true 
+- name: password-auth Auth 4
+  pamd:
+    name: password-auth
+    type: auth
+    control: required
+    module_path: pam_faillock.so
+    module_arguments: 'preauth silent audit deny=8 even_deny_root unlock_time=0'
+    state: updated  
+- name: password-auth Auth 5
+  pamd:
+    name: password-auth
+    type: auth
+    control: required
+    module_path: pam_deny.so
+    state: updated  
+- name: password-auth Account 1
+  pamd: 
+    name: password-auth
+    type: account
+    control: required
+    module_path: "{{ item }}"
+    state: absent 
+  loop:
+    - pam_access.so
+    - pam_unix.so
+- name: password-auth Account 2
+  pamd: 
+    name: password-auth
+    type: account
+    control: required
+    module_path: pam_faillock.so
+    new_type: account
+    new_control: required
+    new_module_path: pam_unix.so
+    state: before 
+- name: password-auth Password 1
+  pamd:
+    name: password-auth
+    type: password
+    control: requisite
+    module_path: pam_pwquality.so
+    module_arguments: 'try_first_pass local_users_only retry=3 authtok_type='
+    state: updated 
+- name: password-auth Password 2
+  pamd:
+    name: password-auth
+    type: password
+    control: requisite
+    module_path: pam_pwhistory.so
+    module_arguments: 'debug use_authtok remember=24 retry=3'
+    state: updated 
+- name: password-auth Password 3
+  pamd:
+    name: password-auth
+    type: password
+    control: sufficient
+    module_path: pam_unix.so
+    module_arguments: 'try_first_pass use_authtok nullok sha512 shadow'
+    state: updated 
+- name: password-auth Password 4
+  pamd:
+    name: password-auth
+    type: password
+    control: required
+    module_path: pam_deny.so
+    state: updated 
+- name: password-auth Session 1
+  pamd:
+    name: password-auth
+    type: session
+    control: optional
+    module_path: pam_keyinit.so
+    module_arguments: 'revoke'
+    state: updated 
+- name: password-auth Session 2
+  pamd:
+    name: password-auth
+    type: session
+    control: required
+    module_path: pam_limites.so
+    state: updated         
+- name: password-auth Session 3
+  pamd:
+    name: password-auth
+    type: session
+    control: optional
+    module_path: pam_systemd.so
+    state: updated 
+- name: password-auth Session 4
+  pamd:
+    name: password-auth
+    type: session
+    control: '[success=1 default=ignore]'
+    module_path: pam_succeed_if.so
+    module_arguments: 'service in crond quiet use_uid'
+    state: updated 
+- name: password-auth Session 5
+  pamd:
+    name: password-auth
+    type: session
+    control: required
+    module_path: pam_unix.so
+    state: updated 
+- name: system-auth Auth 1
+  pamd: 
+    name: system-auth
+    type: auth
+    control: required
+    module_path: pam_env.so
+    state: updated 
+- name: system-auth Auth 2
+  pamd: 
+    name: system-auth
+    type: auth
+    control: required
+    module_path: pam_faillock.so
+    module_arguments: 'preauth silent audit deny=8'
+    state: updated 
+- name: system-auth Auth 3
+  pamd: 
+    name: system-auth
+    type: auth
+    control: sufficient
+    module_path: pam_unix.so
+    module_arguments: 'try_first_pass nullok'
+    state: updated 
+- name: system-auth Auth 4
+  pamd: 
+    name: system-auth
+    type: auth
+    control: '[default=die]'
+    module_path: pam_faillock.so
+    module_arguments: 'authfail audit deny=8'
+    state: updated 
+- name: system-auth Auth 5
+  pamd: 
+    name: system-auth
+    type: auth
+    control: required
+    module_path: pam_deny.so
+    state: updated 
+- name: system-auth Auth 6
+  pamd: 
+    name: system-auth
+    type: auth
+    control: required
+    module_path: pam_faildelay.so
+    module_arguments: 'delay=2000000'
+    state: absent
+- name: system-auth Account 1
+  pamd: 
+    name: system-auth
+    type: account
+    control: required
+    module_path: "{{ item }}"
+    state: absent 
+  loop:
+    - pam_access.so
+    - pam_unix.so
+- name: system-auth Account 2 
+  pamd: 
+    name: system-auth
+    type: account
+    control: required
+    module_path: pam_faillock.so
+    new_type: account
+    new_control: required
+    new_module_path: pam_unix.so
+    state: before 
+- name: system-auth Password 1 
+  pamd: 
+    name: system-auth
+    type: password
+    control: requisite
+    module_path: pam_pwquality.so
+    module_arguments: 'try_first_pass local_users_only retry=3 authtok_type='
+    state: updated 
+- name: system-auth Password 2 
+  pamd: 
+    name: system-auth
+    type: password
+    control: requisite
+    module_path: pam_pwhistory.so
+    module_arguments: 'debug use_authtok remember=24 retry=3'
+    new_type: password 
+    new_control: requisite 
+    new_module_path: pam_pwquality.so
+    state: before
+- name: system-auth Password 3 
+  pamd: 
+    name: system-auth
+    type: password
+    control: sufficient
+    module_path: pam_unix.so
+    module_arguments: 'try_first_pass use_authtok nullok sha512 shadow'
+    state: updated 
+- name: system-auth Password 4 
+  pamd: 
+    name: system-auth
+    type: password
+    control: required
+    module_path: pam_deny.so
+    state: updated 
+- name: system-auth Session 1  
+  pamd: 
+    name: system-auth
+    type: session
+    control: optional
+    module_path: pam_keyinit.so
+    module_arguments: 'revoke'
+    state: updated 
+- name: system-auth Session 2  
+  pamd: 
+    name: system-auth
+    type: session
+    control: required
+    module_path: pam_limits.so
+    state: updated 
+- name: system-auth Session 3  
+  pamd: 
+    name: system-auth
+    type: -session
+    control: optional
+    module_path: pam_systemd.so
+    state: updated 
+- name: system-auth Session 4  
+  pamd: 
+    name: system-auth
+    type: session
+    control: '[success=1 default=ignore]'
+    module_path: pam_succeed_if.so
+    module_arguments: 'service in crond quiet use_uid'
+    state: updated 
+- name: system-auth Session 5  
+  pamd: 
+    name: system-auth
+    type: session
+    control: required
+    module_path: pam_unix.so
+    state: updated 
+...
+
+
+

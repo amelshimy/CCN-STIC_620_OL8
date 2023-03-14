@@ -1,0 +1,10 @@
+RHEL8-CIS:
+  sudo dnf install -y crypto-policies-scripts
+
+RHEL8-STIG:
+  pip3 install jmespath # Control 
+  default:   
+    rhel8stig_min_supported_os_ver:
+      OracleLinux: "8.4"
+
+    rhel8stig_bootloader_password_hash: grub.pbkdf2.sha512.10000  
